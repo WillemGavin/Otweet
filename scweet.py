@@ -1,4 +1,5 @@
 import csv
+import imp
 import os
 import datetime
 import time
@@ -7,11 +8,12 @@ import pandas as pd
 import json
 import bs4
 import utils
-
+import selenium.webdriver.common.by as cb
+import selenium.webdriver.common.action_chains as ac
 
 
 # 获取用户粉丝数
-def getAccountFollowerNum(account, headless=True, write_mode='w', proxy=None, option=None, firefox=False, save_dir="Desktop/outputs"):
+def getAccountFollowerNum(account, headless=True, write_mode='w', proxy=None, option=None, firefox=False, save_dir="outputs"):
     header = ['ScrapeDate', 'followers', 'followering']
 
     url = 'https://twitter.com/' + account
@@ -37,16 +39,24 @@ def getAccountFollowerNum(account, headless=True, write_mode='w', proxy=None, op
         driver.get(url)
         time.sleep(random.uniform(3, 5))
 
+        # to_hover = driver.find_element(cb.By.XPATH, value='//div[@data-testid="UserName"]/../div[4]/div[1]/a')
+        # ac.ActionChains(driver).move_to_element(to_hover).perform()
+        # # time.sleep(random.uniform(1, 2))
+        # followers = driver.find_element(cb.By.XPATH, value='//span[@data-testid="HoverLabel"]/span')
+        # print(followers.text)
         page_obj = bs4.BeautifulSoup(driver.page_source, 'html.parser')
-        scripts = page_obj.find('script', type="application/ld+json").text
-        user_data = scripts[scripts.find('{') : scripts.rfind('}') + 1]
-        # print(user_data)
-        data_json = json.loads(user_data)
-
-        followers_num = data_json["author"]["interactionStatistic"][0]["userInteractionCount"]
-        # print(followers_num)
-        followering_num = data_json["author"]["interactionStatistic"][1]["userInteractionCount"]
-        # print(followering_num)
+        scripts = page_obj.find_all('script', type="application/ld+json")
+        for script in scripts:
+            # print(script.string)
+            # user_data = script.text[scripts.find('{') : scripts.rfind('}') + 1]
+            # print(user_data)
+            data_json = json.loads(script.string)
+            if "author" in data_json:
+                followers_num = data_json["author"]["interactionStatistic"][0]["userInteractionCount"]
+                # print(followers_num)
+                followering_num = data_json["author"]["interactionStatistic"][1]["userInteractionCount"]
+                # print(followering_num)
+                break
     except Exception as e:
         print("出现错误，请稍后重试！或检查用户地址是否正确")
         # ot.update_information("出现错误，请稍后重试！或检查用户地址是否正确")
@@ -59,9 +69,11 @@ def getAccountFollowerNum(account, headless=True, write_mode='w', proxy=None, op
         return 
 
     with open(path, write_mode, newline='', encoding='utf-8') as f:
+        file = open(path)
+        line = len(file.readlines())
+        file.close()
         writer = csv.writer(f)
-
-        if write_mode == 'w' or os.path.getsize(path) == 0:
+        if write_mode == 'w' or line < 2:
             # write the csv header
             writer.writerow(header)
         else: 
@@ -71,6 +83,7 @@ def getAccountFollowerNum(account, headless=True, write_mode='w', proxy=None, op
                 print(today_date + " scraped, skip this time --------")
                 return
 
+        print("followers: ", followers_num)
         data = (date, followers_num, followering_num)
         writer.writerow(data)
         print(url + ': followers and followering Scraped!!!')
@@ -78,7 +91,7 @@ def getAccountFollowerNum(account, headless=True, write_mode='w', proxy=None, op
     return data
 
 # 爬取推文
-def scrape(since, until=None, words=None, to_account=None, from_account="bitcoin", mention_account=None, interval=5, lang=None,
+def scrape(since, until=None, words=None, to_account=None, from_account="ONTOWallet", mention_account=None, interval=5, lang=None,
           headless=True, limit=float("inf"), display_type="Top", proxy=None, hashtag=None, 
           show_images=False, save_images=False, save_dir="outputs", filter_replies=False, proximity=False, 
           geocode=None, minreplies=None, minlikes=None, minretweets=None, write_mode="a+"):
@@ -149,14 +162,17 @@ def scrape(since, until=None, words=None, to_account=None, from_account="bitcoin
     # open the file
     with open(path, write_mode, newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
-        if write_mode == 'w' or os.path.getsize(path) == 0:
+        file = open(path)
+        line = len(file.readlines())
+        file.close()
+        if write_mode == 'w' or line < 2:
             # write the csv header
             writer.writerow(header)
         else:
             last_scrape_date = str(utils.get_last_date_from_csv(path))[:10]
             if last_scrape_date == today_date:
                 print(today_date + " scraped, skip this time --------")
-                return
+                return None
         # log search page for a specific <interval> of time and keep scrolling unltil scrolling stops or reach the <until>
         while until_local <= datetime.datetime.strptime(until, '%Y-%m-%d'):
             # number of scrolls

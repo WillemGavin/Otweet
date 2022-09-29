@@ -31,7 +31,7 @@ write_mode_entry.insert(0, "a+")
 save_dir_entry = tk.Entry(win)
 save_dir_entry.insert(0, "Desktop/outputs")
 from_account_entry = tk.Entry(win)
-from_account_entry.insert(0, "@bitcoin")
+from_account_entry.insert(0, "@ONTOWallet")
 proxy_entry = tk.Entry(win)
 proxy_entry.insert(0, "None")
 
